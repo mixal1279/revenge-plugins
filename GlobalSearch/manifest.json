@@ -1,0 +1,12 @@
+{
+  "name": "GlobalSearch",
+  "description": "Szukaj wiadomości na wszystkich serwerach naraz — ikona lupy w navbarze.",
+  "authors": [
+    {
+      "name": "Mixalo",
+      "id": "0"
+    }
+  ],
+  "main": "index.js",
+  "hash": "0"
+}
