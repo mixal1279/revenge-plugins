@@ -1,0 +1,15 @@
+{
+  "id": "global-search",
+  "name": "Global Search",
+  "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
+  "authors": [
+    {
+      "name": "Michal",
+      "id": "0"
+    }
+  ],
+  "main": "src/index.ts",
+  "revenge": {
+    "icon": "SearchIcon"
+  }
+}
