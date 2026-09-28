@@ -8,7 +8,7 @@
     }
   ],
   "main": "builds/global-search/index.js",
-  "hash": "8e45d639325009f8c6948ea417f68f96fab3c08fd9293aa0ddf4cedcc39b55ec",
+  "hash": "d746b38df4bf41913581c52e56031a8b69e708ba6b89ed5b3ca496f8c910859f",
   "revenge": {
     "icon": "SearchIcon"
   }
