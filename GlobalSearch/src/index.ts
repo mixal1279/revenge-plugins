@@ -1,4 +1,4 @@
-import { find, findByProps, findByStoreName } from "@revenge-mod/metro";
+import { find, findByNameAll, findByProps, findByStoreName } from "@revenge-mod/metro";
 import { ReactNative as RN } from "@revenge-mod/metro/common";
 import { after } from "@revenge-mod/patcher";
 import { showToast } from "@revenge-mod/ui/toasts";
@@ -27,6 +27,11 @@ const APIModule = findByProps("getAPIBaseURL");
 const getAPIBaseURL =
   APIModule?.getAPIBaseURL || (() => "https://discord.com/api/v9");
 
+// Optional navigation modules. Search results remain usable even if a
+// particular Discord build does not expose one of these actions.
+const MessageActions = findByProps("jumpToMessage");
+const ChannelActions = findByProps("selectChannel");
+
 const patches: (() => void)[] = [];
 
 export const vstorage = storage as { showInChannelListHeader: boolean };
@@ -46,6 +51,7 @@ async function fetchGuildSearch(
   query: string,
   limit: number,
   offset: number,
+  signal?: AbortSignal,
 ): Promise<{ hits: any[]; total: number }> {
   const token = AuthStore?.getToken?.();
   if (!token) return { hits: [], total: 0 };
@@ -62,6 +68,7 @@ async function fetchGuildSearch(
           Authorization: token,
           "Content-Type": "application/json",
         },
+        signal,
       });
 
       if (res.status === 429) {
@@ -116,7 +123,8 @@ async function performGlobalSearch(
   query: string,
   limit = 25,
   offset = 0,
-): Promise<SearchResult> {
+  signal?: AbortSignal,
+): Promise<SearchResult & { hasMore: boolean }> {
   const token = AuthStore?.getToken?.();
   if (!token) {
     showToast(
@@ -129,6 +137,7 @@ async function performGlobalSearch(
   const guilds = Object.values(GuildStore?.getGuilds?.() ?? {}) as any[];
   const allMessages: any[] = [];
   let totalResults = 0;
+  let hasMore = false;
 
   // Small worker pool instead of Promise.all(guilds.map(...)).
   let nextIndex = 0;
@@ -139,9 +148,19 @@ async function performGlobalSearch(
       const guild = guilds[index];
       if (!guild?.id) continue;
 
-      const result = await fetchGuildSearch(guild, query, limit, offset);
+      const result = await fetchGuildSearch(guild, query, limit, offset, signal);
       allMessages.push(...result.hits);
       totalResults += result.total;
+
+      // Discord paginates independently per guild. Keep loading while at
+      // least one guild reports another page, or returned a full page when
+      // total_results is unavailable.
+      if (
+        result.hits.length >= limit ||
+        (result.total > 0 && offset + result.hits.length < result.total)
+      ) {
+        hasMore = true;
+      }
     }
   };
 
@@ -157,7 +176,61 @@ async function performGlobalSearch(
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
   );
 
-  return { messages: allMessages, totalResults };
+  return { messages: allMessages, totalResults, hasMore };
+}
+
+async function openSearchResult(item: any) {
+  const channelId = item?.channel_id;
+  const messageId = item?.id;
+
+  if (!channelId || !messageId) {
+    showToast(
+      "Nie można otworzyć tego wyniku.",
+      getAssetIDByName("CircleXIcon-primary"),
+    );
+    return;
+  }
+
+  const jump = MessageActions?.jumpToMessage;
+  if (typeof jump === "function") {
+    try {
+      await Promise.resolve(
+        jump({
+          channelId,
+          messageId,
+          flash: true,
+          jumpType: "INSTANT",
+        }),
+      );
+      return;
+    } catch {
+      try {
+        await Promise.resolve(jump(channelId, messageId, true));
+        return;
+      } catch {
+        // Fall through to channel selection.
+      }
+    }
+  }
+
+  const selectChannel = ChannelActions?.selectChannel;
+  if (typeof selectChannel === "function") {
+    try {
+      selectChannel(channelId);
+      showToast(
+        "Otwarto kanał. Przejdź do znalezionej wiadomości.",
+        getAssetIDByName("ChatIcon"),
+      );
+      return;
+    } catch {
+      // Fall through to an informational toast.
+    }
+  }
+
+  showToast(
+    `Kanał: ${channelId} • wiadomość: ${messageId}`,
+    getAssetIDByName("ChatIcon"),
+  );
 }
 
 // ─── UI komponent ────────────────────────────────────────────────────────────
@@ -169,26 +242,32 @@ const GlobalSearchUI = ({ onClose }: { onClose?: () => void }) => {
   const [hasSearched, setHasSearched] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(0);
   const [totalAvailableResults, setTotalAvailableResults] = React.useState(0);
-
+  const [hasMore, setHasMore] = React.useState(false);
+  const searchGeneration = React.useRef(0);
   const ITEMS_PER_PAGE = 25;
 
   const executeSearch = async (q: string, pageNum: number) => {
     if (!q.trim() || loading) return;
 
+    const generation = ++searchGeneration.current;
     setLoading(true);
     setHasSearched(true);
 
     try {
-      const { messages, totalResults } = await performGlobalSearch(
-        q.trim(),
-        ITEMS_PER_PAGE,
-        pageNum * ITEMS_PER_PAGE,
-      );
+      const { messages, totalResults, hasMore: nextHasMore } =
+        await performGlobalSearch(
+          q.trim(),
+          ITEMS_PER_PAGE,
+          pageNum * ITEMS_PER_PAGE,
+        );
+
+      if (generation !== searchGeneration.current) return;
 
       setResults((prev) =>
         pageNum === 0 ? messages : [...prev, ...messages],
       );
       setTotalAvailableResults(totalResults);
+      setHasMore(nextHasMore);
     } catch (error) {
       console.error("[GlobalSearch] Search failed:", error);
       showToast(
@@ -196,7 +275,9 @@ const GlobalSearchUI = ({ onClose }: { onClose?: () => void }) => {
         getAssetIDByName("CircleXIcon-primary"),
       );
     } finally {
-      setLoading(false);
+      if (generation === searchGeneration.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -206,6 +287,8 @@ const GlobalSearchUI = ({ onClose }: { onClose?: () => void }) => {
     setCurrentPage(0);
     setResults([]);
     setTotalAvailableResults(0);
+    setHasMore(false);
+    ++searchGeneration.current;
     void executeSearch(query, 0);
   };
 
@@ -223,8 +306,9 @@ const GlobalSearchUI = ({ onClose }: { onClose?: () => void }) => {
   const canLoadMore =
     !loading &&
     hasSearched &&
+    hasMore &&
     results.length > 0 &&
-    currentPage < 100; // defensive upper bound against accidental endless scrolling
+    currentPage < 100;
 
   return React.createElement(
     SafeAreaView,
@@ -356,13 +440,9 @@ const GlobalSearchUI = ({ onClose }: { onClose?: () => void }) => {
               { style: { color: "#72767d", fontSize: 11 } },
               new Date(item.timestamp).toLocaleDateString("pl-PL"),
             ),
-            onPress: () =>
-              showToast(
-                `#${item.channel_id} • ${new Date(
-                  item.timestamp,
-                ).toLocaleString("pl-PL")}`,
-                getAssetIDByName("ChatIcon"),
-              ),
+            onPress: () => {
+              void openSearchResult(item);
+            },
           }),
         style: { flex: 1 },
         onEndReached: canLoadMore ? handleLoadMore : undefined,
@@ -527,6 +607,155 @@ const HEADER_COMPONENT_NAMES = [
   "ChannelListHeader",
 ];
 
+function getHeaderModules() {
+  const modules: any[] = [];
+  const seen = new Set<any>();
+
+  for (const name of HEADER_COMPONENT_NAMES) {
+    let found: any[] = [];
+    try {
+      found = findByNameAll(name) ?? [];
+    } catch {
+      found = [];
+    }
+
+    for (const module of found) {
+      if (!module || seen.has(module)) continue;
+      seen.add(module);
+      modules.push(module);
+    }
+  }
+
+  // ChannelHeader was verified on this Classic Revenge build and is kept as
+  // a fallback even if findByNameAll is unavailable in an older build.
+  if (modules.length === 0) {
+    try {
+      const fallback = find(
+        (module: any) => module?.default?.name === "ChannelHeader",
+      );
+      if (fallback) modules.push(fallback);
+    } catch {}
+  }
+
+  return modules;
+}
+
+function containsGlobalSearchPicker(children: any) {
+  const list = Array.isArray(children)
+    ? children
+    : children != null
+      ? [children]
+      : [];
+
+  return list.some(
+    (child: any) => child?.key === "global-search-mode-picker",
+  );
+}
+
+function findNativeSearchButton(node: any, searchIconId: any): any | null {
+  if (!React.isValidElement(node)) return null;
+
+  const children = node.props?.children;
+  const list = Array.isArray(children)
+    ? children
+    : children != null
+      ? [children]
+      : [];
+
+  for (const child of list) {
+    if (!React.isValidElement(child)) continue;
+
+    const childChildren = child.props?.children;
+    const candidates = Array.isArray(childChildren)
+      ? childChildren
+      : childChildren != null
+        ? [childChildren]
+        : [];
+
+    if (
+      typeof child.props?.onPress === "function" &&
+      candidates.some(
+        (candidate: any) =>
+          React.isValidElement(candidate) &&
+          candidate.props?.source === searchIconId,
+      )
+    ) {
+      return child;
+    }
+
+    const nested = findNativeSearchButton(child, searchIconId);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+function patchSearchButton(
+  node: any,
+  searchIconId: any,
+): { node: any; found: boolean; changed: boolean } {
+  if (!React.isValidElement(node)) {
+    return { node, found: false, changed: false };
+  }
+
+  const children = node.props?.children;
+  const list = Array.isArray(children)
+    ? children
+    : children != null
+      ? [children]
+      : [];
+
+  let changed = false;
+  let found = false;
+
+  const nextChildren = list.map((child: any) => {
+    if (!React.isValidElement(child)) return child;
+
+    const childChildren = child.props?.children;
+    const candidates = Array.isArray(childChildren)
+      ? childChildren
+      : childChildren != null
+        ? [childChildren]
+        : [];
+
+    const isNativeSearchButton =
+      typeof child.props?.onPress === "function" &&
+      candidates.some(
+        (candidate: any) =>
+          React.isValidElement(candidate) &&
+          candidate.props?.source === searchIconId,
+      );
+
+    if (isNativeSearchButton) {
+      found = true;
+      changed = true;
+
+      return React.cloneElement(child, {
+        onPress: () => {
+          (SearchModePicker as any)._open?.(child.props.onPress);
+        },
+      });
+    }
+
+    const nested = patchSearchButton(child, searchIconId);
+    if (nested.found) found = true;
+    if (nested.changed) changed = true;
+    return nested.node;
+  });
+
+  if (!changed) return { node, found, changed: false };
+
+  return {
+    node: React.cloneElement(node, {
+      children: Array.isArray(children)
+        ? nextChildren
+        : nextChildren[0] ?? null,
+    }),
+    found,
+    changed: true,
+  };
+}
+
 export function onLoad() {
   showToast(
     "Global Search loaded!",
@@ -538,113 +767,40 @@ export function onLoad() {
   const searchIconId = getAssetIDByName("SearchIcon");
   const patchedModules = new Set<any>();
 
-  const patchSearchButton = (node: any): { node: any; found: boolean } => {
-    if (!React.isValidElement(node)) {
-      return { node, found: false };
-    }
+  for (const module of getHeaderModules()) {
+    if (!module || patchedModules.has(module)) continue;
+    patchedModules.add(module);
 
-    const children = node.props?.children;
-    const childArray = Array.isArray(children)
-      ? children
-      : children != null
-        ? [children]
-        : [];
+    patches.push(
+      after("default", module, (_, res) => {
+        if (!React.isValidElement(res)) return res;
+        if (!vstorage.showInChannelListHeader) return res;
 
-    let changed = false;
-    let found = false;
+        const result = patchSearchButton(res, searchIconId);
+        if (!result.found) return res;
 
-    const nextChildren = childArray.map((child: any) => {
-      if (!React.isValidElement(child)) return child;
+        const children = result.node.props?.children;
+        if (!Array.isArray(children)) return result.node;
 
-      const childChildren = child.props?.children;
-      const candidates = Array.isArray(childChildren)
-        ? childChildren
-        : childChildren != null
-          ? [childChildren]
-          : [];
+        if (containsGlobalSearchPicker(children)) {
+          return result.node;
+        }
 
-      const isNativeSearchButton =
-        typeof child.props?.onPress === "function" &&
-        candidates.some(
-          (candidate: any) =>
-            React.isValidElement(candidate) &&
-            candidate.props?.source === searchIconId,
-        );
-
-      if (isNativeSearchButton) {
-        found = true;
-        changed = true;
-
-        return React.cloneElement(child, {
-          onPress: () =>
-            (SearchModePicker as any)._open?.(child.props.onPress),
+        return React.cloneElement(result.node, {
+          children: [
+            ...children,
+            React.createElement(SearchModePicker, {
+              key: "global-search-mode-picker",
+            }),
+          ],
         });
-      }
-
-      const result = patchSearchButton(child);
-      if (result.found) found = true;
-      if (result.node !== child) changed = true;
-      return result.node;
-    });
-
-    if (!changed) return { node, found };
-
-    return {
-      node: React.cloneElement(node, {
-        children: Array.isArray(children)
-          ? nextChildren
-          : nextChildren[0] ?? null,
       }),
-      found,
-    };
-  };
-
-  for (const name of HEADER_COMPONENT_NAMES) {
-    const modules = [
-      ...(find((module: any) => module?.default?.name === name)
-        ? [find((module: any) => module?.default?.name === name)]
-        : []),
-    ];
-
-    for (const module of modules) {
-      if (!module || patchedModules.has(module)) continue;
-      patchedModules.add(module);
-
-      patches.push(
-        after("default", module, (_, res) => {
-          if (!React.isValidElement(res)) return res;
-          if (!vstorage.showInChannelListHeader) return res;
-
-          const result = patchSearchButton(res);
-          if (!result.found) return res;
-
-          const children = result.node.props?.children;
-          if (!Array.isArray(children)) return result.node;
-
-          if (
-            children.some(
-              (child: any) => child?.key === "global-search-mode-picker",
-            )
-          ) {
-            return result.node;
-          }
-
-          return React.cloneElement(result.node, {
-            children: [
-              ...children,
-              React.createElement(SearchModePicker, {
-                key: "global-search-mode-picker",
-              }),
-            ],
-          });
-        }),
-      );
-    }
+    );
   }
 
   if (patches.length === 0) {
     showToast(
-      "Nie znaleziono nagłówków wyszukiwania.",
+      "Nie znaleziono obsługiwanych nagłówków.",
       getAssetIDByName("CircleXIcon-primary"),
     );
   }
@@ -661,7 +817,6 @@ export function onUnload() {
 export const settings = GlobalSearchUI;
 
 // Classic Revenge/Bunny native plugin lifecycle.
-// The loader expects a plugin instance with start/stop methods.
 export default {
   start: onLoad,
   stop: onUnload,
