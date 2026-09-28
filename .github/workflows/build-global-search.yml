@@ -123,7 +123,7 @@ jobs:
           touch published/.nojekyll
           git -C published config user.name "github-actions[bot]"
           git -C published config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C published add index.json pool .nojekyll
+          git -C published add index.json manifest.json index.js pool .nojekyll
           if git -C published diff --cached --quiet; then
             echo "No published changes."
           else
