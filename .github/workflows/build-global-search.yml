@@ -12,6 +12,12 @@ on:
       - "tsconfig.json"
       - "bun.lock"
       - ".github/workflows/build-global-search.yml"
+  pull_request:
+    paths:
+      - "plugins/**"
+      - "package.json"
+      - "tsconfig.json"
+      - ".github/workflows/build-global-search.yml"
   workflow_dispatch:
 
 permissions:
