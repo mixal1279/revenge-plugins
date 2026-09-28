@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "name": "Michał Shotmaker's Revenge Next Plugins",
+  "description": "Plugins for Revenge Next by Michał Shotmaker.",
+  "plugins": {
+    "global-search": {
+      "name": "Global Search",
+      "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
+      "author": "Michal",
+      "channels": {"latest": "1.0.0"},
+      "versions": {
+        "1.0.0": {
+          "url": "https://mixal1279.github.io/revenge-plugins/pool/global-search@1.0.0.zip",
+          "sha256": "ab4be06da6057ad350524f7d19aae2075d3b7b28283645f9dadffa664cde5a2e",
+          "size": 3344,
+          "dependencies": {
+            "revenge.api": {"version": ">=1 <2"},
+            "discord": {"version": "*"}
+          }
+        }
+      }
+    }
+  }
+}
