@@ -48,11 +48,11 @@ bundled = bundled.replace(/require\("([^"]+)"\)/g, (match, id) => {
   return mapped;
 });
 
-const wrapped = '(function(vendetta){' + bundled +
-  '\nvar _exp=typeof module!=="undefined"?module.exports:{};' +
-  '\nvar _plugin=(_exp&&_exp.__esModule&&_exp.default!=null)?_exp.default:(_exp&&_exp.default!=null?_exp.default:_exp);' +
-  '\nreturn _plugin;' +
-  '\n})(vendetta)';
+const wrapped =
+  'var module={exports:{}};var exports=module.exports;\n' +
+  bundled +
+  '\nvar plugin=(module.exports&&module.exports.__esModule&&module.exports.default!=null)' +
+  '?module.exports.default:(module.exports&&module.exports.default!=null?module.exports.default:module.exports);';
 
 await mkdir("GlobalSearch", { recursive: true });
 await writeFile(out, wrapped);
