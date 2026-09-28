@@ -1,12 +1,26 @@
 {
-  "name": "revenge-plugins",
+  "name": "@mixal1279/revenge-plugins",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs"
+    "build": "revenge-plugin build",
+    "build:dev": "revenge-plugin build --dev",
+    "generate-index": "revenge-plugin generate-index",
+    "plan-releases": "revenge-plugin plan-releases",
+    "serve": "revenge-plugin serve",
+    "lint:types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@revenge-mod/plugin-cli": "git+https://github.com/revenge-mod/revenge-plugin-cli.git",
+    "@revenge-mod/types": "git+https://github.com/revenge-mod/revenge-types.git"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0",
-    "typescript": "^5.8.3"
-  }
+    "@types/react": "^19.2.18",
+    "react-native": "0.81.6",
+    "typescript": "^7.0.2"
+  },
+  "trustedDependencies": [
+    "@revenge-mod/plugin-cli",
+    "@swc/core"
+  ]
 }

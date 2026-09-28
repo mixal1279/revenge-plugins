@@ -1,13 +1,23 @@
-name: Build Global Search
+name: Build Revenge Next plugins
 
 on:
   push:
     branches:
       - main
+      - "feat/**"
       - "fix/**"
-    paths-ignore:
-      - "GlobalSearch/index.js"
-      - "GlobalSearch/manifest.json"
+    paths:
+      - "plugins/**"
+      - "package.json"
+      - "tsconfig.json"
+      - "bun.lock"
+      - ".github/workflows/build-global-search.yml"
+  pull_request:
+    paths:
+      - "plugins/**"
+      - "package.json"
+      - "tsconfig.json"
+      - ".github/workflows/build-global-search.yml"
   workflow_dispatch:
 
 permissions:
@@ -17,29 +27,118 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm install
+        run: bun install
 
-      - name: Build plugin
-        run: npm run build
+      - name: Typecheck
+        run: bun run lint:types
 
-      - name: Commit generated plugin
+      - name: Build plugins
+        run: bun run build
+
+      - name: Upload plugin artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: revenge-plugins
+          path: |
+            plugins/*/build/
+            plugins/*/manifest.json
+
+      - name: Checkout published pool
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: published
+
+      - name: Package and publish Global Search
+        shell: bash
         run: |
-          if git diff --quiet; then
-            echo "No generated changes."
-            exit 0
-          fi
+          set -euo pipefail
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add GlobalSearch/index.js GlobalSearch/manifest.json
-          git commit -m "build(GlobalSearch): generate distributable plugin"
-          git push
+          PLUGIN_DIR="plugins/global-search"
+          MANIFEST="$PLUGIN_DIR/manifest.json"
+          VERSION="$(python3 -c 'import json; print(json.load(open("'"$MANIFEST"'"))["version"])')"
+          ID="$(python3 -c 'import json; print(json.load(open("'"$MANIFEST"'"))["id"])')"
+
+          test -f "$PLUGIN_DIR/build/js/index.js"
+          mkdir -p /tmp/plugin-package
+          cp "$MANIFEST" /tmp/plugin-package/manifest.json
+          cp "$PLUGIN_DIR/build/js/index.js" /tmp/plugin-package/index.js
+
+          mkdir -p published/pool
+          # Keep the published root compatible with Revenge's direct installer.
+          # The packaged ZIP keeps the native Revenge Next manifest; the root
+          # manifest additionally exposes the legacy main entrypoint used by
+          # the direct installer UI.
+          python3 - "$MANIFEST" published/manifest.json <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          source = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          source["main"] = "index.js"
+          Path(sys.argv[2]).write_text(json.dumps(source, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          PY
+          cp "$PLUGIN_DIR/build/js/index.js" published/index.js
+          PACKAGE="/tmp/\${ID}@\${VERSION}.zip"
+          (cd /tmp/plugin-package && zip -q -X "$PACKAGE" manifest.json index.js)
+
+          cp "$PACKAGE" "published/pool/\${ID}@\${VERSION}.zip"
+
+          SHA256="$(sha256sum "$PACKAGE" | cut -d' ' -f1)"
+          SIZE="$(stat -c '%s' "$PACKAGE")"
+
+          python3 - "$SHA256" "$SIZE" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          sha256, size = sys.argv[1], int(sys.argv[2])
+          path = Path("published/index.json")
+
+          data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {
+              "format": 1,
+              "name": "Michał Shotmaker's Revenge Next Plugins",
+              "description": "Plugins for Revenge Next by Michał Shotmaker.",
+              "plugins": {}
+          }
+
+          plugin = data.setdefault("plugins", {}).setdefault("global-search", {
+              "name": "Global Search",
+              "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
+              "author": "Michal",
+              "channels": {}
+          })
+
+          plugin["channels"]["latest"] = "1.0.0"
+          plugin.setdefault("versions", {})["1.0.0"] = {
+              "url": "https://mixal1279.github.io/revenge-plugins/pool/global-search@1.0.0.zip",
+              "sha256": sha256,
+              "size": size,
+              "dependencies": {
+                  "revenge.api": {"version": ">=1 <2"},
+                  "discord": {"version": "*"}
+              }
+          }
+
+          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          PY
+
+          touch published/.nojekyll
+          git -C published config user.name "github-actions[bot]"
+          git -C published config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C published add index.json manifest.json index.js pool .nojekyll
+          if git -C published diff --cached --quiet; then
+            echo "No published changes."
+          else
+            git -C published commit -m "Publish Global Search \${VERSION}"
+            git -C published push origin HEAD:gh-pages
+          fi
