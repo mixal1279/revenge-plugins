@@ -8,8 +8,9 @@
       "id": "0"
     }
   ],
-  "main": "src/index.ts",
+  "main": "index.js",
   "revenge": {
     "icon": "SearchIcon"
-  }
+  },
+  "hash": "8e45d639325009f8c6948ea417f68f96fab3c08fd9293aa0ddf4cedcc39b55ec"
 }
