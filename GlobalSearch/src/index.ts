@@ -399,6 +399,121 @@ const GlobalSearchModal = () => {
   );
 };
 
+// Reuses Discord's existing search icon and adds a second search mode.
+const SearchModePicker = () => {
+  const [visible, setVisible] = React.useState(false);
+  const nativeSearchRef = React.useRef<(() => void) | null>(null);
+
+  (SearchModePicker as any)._open = (nativeSearch: () => void) => {
+    nativeSearchRef.current = nativeSearch;
+    setVisible(true);
+  };
+
+  const close = () => setVisible(false);
+
+  return React.createElement(
+    Modal,
+    {
+      visible,
+      transparent: true,
+      animationType: "fade",
+      onRequestClose: close,
+    },
+    React.createElement(
+      View,
+      {
+        style: {
+          flex: 1,
+          justifyContent: "center",
+          padding: 24,
+          backgroundColor: "rgba(0,0,0,0.65)",
+        },
+      },
+      React.createElement(
+        View,
+        {
+          style: {
+            backgroundColor: "#2b2d31",
+            borderRadius: 12,
+            padding: 16,
+          },
+        },
+        [
+          React.createElement(
+            Text,
+            {
+              key: "title",
+              style: {
+                color: "#fff",
+                fontSize: 18,
+                fontWeight: "bold",
+                marginBottom: 12,
+              },
+            },
+            "Wyszukiwanie",
+          ),
+          React.createElement(
+            TouchableOpacity,
+            {
+              key: "native",
+              onPress: () => {
+                const callback = nativeSearchRef.current;
+                close();
+                callback?.();
+              },
+              style: {
+                padding: 14,
+                borderRadius: 8,
+                backgroundColor: "#36393f",
+                marginBottom: 8,
+              },
+            },
+            React.createElement(
+              Text,
+              { style: { color: "#fff", fontSize: 15 } },
+              "🔍 Szukaj na tym kanale",
+            ),
+          ),
+          React.createElement(
+            TouchableOpacity,
+            {
+              key: "global",
+              onPress: () => {
+                close();
+                (GlobalSearchModal as any)._open?.();
+              },
+              style: {
+                padding: 14,
+                borderRadius: 8,
+                backgroundColor: "#5865F2",
+                marginBottom: 8,
+              },
+            },
+            React.createElement(
+              Text,
+              { style: { color: "#fff", fontSize: 15 } },
+              "🌐 Szukaj we wszystkich serwerach",
+            ),
+          ),
+          React.createElement(
+            TouchableOpacity,
+            {
+              key: "cancel",
+              onPress: close,
+              style: { padding: 10, alignItems: "center" },
+            },
+            React.createElement(
+              Text,
+              { style: { color: "#b5bac1", fontSize: 14 } },
+              "Anuluj",
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+};
+
 // ─── onLoad / onUnload ───────────────────────────────────────────────────────
 
 export function onLoad() {
@@ -420,91 +535,7 @@ export function onLoad() {
         if (!vstorage.showInChannelListHeader) return res;
 
         const searchIconId = getAssetIDByName("SearchIcon");
-
-        const openModePicker = () => {
-          // Use the existing Discord search button, but let the user choose
-          // between Discord's normal search and Global Search.
-          const Picker = () =>
-            React.createElement(
-              Modal,
-              {
-                visible: true,
-                transparent: true,
-                animationType: "fade",
-                onRequestClose: () => undefined,
-              },
-              React.createElement(
-                View,
-                {
-                  style: {
-                    flex: 1,
-                    justifyContent: "center",
-                    padding: 24,
-                    backgroundColor: "rgba(0,0,0,0.65)",
-                  },
-                },
-                React.createElement(
-                  View,
-                  {
-                    style: {
-                      backgroundColor: "#2b2d31",
-                      borderRadius: 12,
-                      padding: 16,
-                    },
-                  },
-                  [
-                    React.createElement(
-                      Text,
-                      {
-                        key: "title",
-                        style: {
-                          color: "#fff",
-                          fontSize: 18,
-                          fontWeight: "bold",
-                          marginBottom: 12,
-                        },
-                      },
-                      "Wyszukiwanie",
-                    ),
-                    React.createElement(
-                      TouchableOpacity,
-                      {
-                        key: "global",
-                        onPress: () => (GlobalSearchModal as any)._open?.(),
-                        style: {
-                          padding: 14,
-                          borderRadius: 8,
-                          backgroundColor: "#5865F2",
-                          marginBottom: 8,
-                        },
-                      },
-                      React.createElement(
-                        Text,
-                        { style: { color: "#fff", fontSize: 15 } },
-                        "🔍 Szukaj we wszystkich serwerach",
-                      ),
-                    ),
-                    React.createElement(
-                      TouchableOpacity,
-                      {
-                        key: "cancel",
-                        onPress: () => undefined,
-                        style: { padding: 12, alignItems: "center" },
-                      },
-                      React.createElement(
-                        Text,
-                        { style: { color: "#b5bac1", fontSize: 14 } },
-                        "Anuluj",
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-
-          // The picker is mounted below through the cloned header.
-          return React.createElement(Picker);
-        };
+        let searchButtonFound = false;
 
         const transform = (node: any): any => {
           if (!React.isValidElement(node)) return node;
@@ -520,32 +551,28 @@ export function onLoad() {
           const nextChildren = childArray.map((child: any) => {
             if (!React.isValidElement(child)) return child;
 
-            // Discord's native search button contains the SearchIcon asset.
-            const isSearchButton = (() => {
-              const childChildren = child.props?.children;
-              const candidates = Array.isArray(childChildren)
-                ? childChildren
-                : childChildren != null
-                  ? [childChildren]
-                  : [];
+            const childChildren = child.props?.children;
+            const candidates = Array.isArray(childChildren)
+              ? childChildren
+              : childChildren != null
+                ? [childChildren]
+                : [];
 
-              return candidates.some(
+            const isSearchButton =
+              typeof child.props?.onPress === "function" &&
+              candidates.some(
                 (candidate: any) =>
                   React.isValidElement(candidate) &&
                   candidate.props?.source === searchIconId,
               );
-            })();
 
-            if (isSearchButton && typeof child.props?.onPress === "function") {
+            if (isSearchButton) {
+              searchButtonFound = true;
               changed = true;
-              const originalOnPress = child.props.onPress;
 
               return React.cloneElement(child, {
-                onPress: () => {
-                  // Keep Discord's native search as the first option.
-                  // Global Search is exposed through the same existing icon.
-                  originalOnPress();
-                },
+                onPress: () =>
+                  (SearchModePicker as any)._open?.(child.props.onPress),
               });
             }
 
@@ -563,9 +590,29 @@ export function onLoad() {
           });
         };
 
-        // For now only reuse the existing magnifier; never add a second one.
-        // The native button remains visually unchanged.
-        return transform(res);
+        const transformed = transform(res);
+
+        if (!searchButtonFound) return transformed;
+
+        // Mount the picker once alongside the existing header children.
+        const picker = React.createElement(SearchModePicker, {
+          key: "global-search-mode-picker",
+        });
+
+        const children = transformed.props?.children;
+        if (Array.isArray(children)) {
+          if (
+            !children.some(
+              (child: any) => child?.key === "global-search-mode-picker",
+            )
+          ) {
+            return React.cloneElement(transformed, {
+              children: [...children, picker],
+            });
+          }
+        }
+
+        return transformed;
       }),
     );
   } else {
