@@ -11,7 +11,7 @@ on:
       - "package.json"
       - "tsconfig.json"
       - "bun.lock"
-      - ".github/workflows/build-revenge-plugins.yml"
+      - ".github/workflows/build-global-search.yml"
   workflow_dispatch:
 
 permissions:
