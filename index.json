@@ -7,15 +7,21 @@
       "name": "Global Search",
       "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
       "author": "Michal",
-      "channels": {"latest": "1.0.0"},
+      "channels": {
+        "latest": "1.0.0"
+      },
       "versions": {
         "1.0.0": {
-          "url": "https://raw.githubusercontent.com/mixal1279/revenge-plugins/gh-pages/pool/global-search@1.0.0.zip",
-          "sha256": "ab4be06da6057ad350524f7d19aae2075d3b7b28283645f9dadffa664cde5a2e",
-          "size": 3344,
+          "url": "https://mixal1279.github.io/revenge-plugins/pool/global-search@1.0.0.zip",
+          "sha256": "d2a85fb09e3910a37f567f846af278fd189b818d0717e3e03081ebff8c26044b",
+          "size": 3240,
           "dependencies": {
-            "revenge.api": {"version": ">=1 <2"},
-            "discord": {"version": "*"}
+            "revenge.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
           }
         }
       }
