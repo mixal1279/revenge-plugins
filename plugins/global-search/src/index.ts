@@ -449,7 +449,7 @@ export default plugin({
     if (!settings.showInChannelListHeader) return;
 
     const header = lookupModule(withName("ChannelListHeader"))[0] as
-      | { default?: (...args: any[]) => any }
+      | { default: (...args: any[]) => any }
       | undefined;
 
     if (!header?.default) {
@@ -458,7 +458,7 @@ export default plugin({
     }
 
     unpatches.push(
-      after(header, "default", (_args: any[], result: any) => {
+      after(header, "default", (result: any) => {
         if (!result?.props) return result;
 
         const searchButton = React.createElement(
