@@ -10,7 +10,7 @@
       "channels": {"latest": "1.0.0"},
       "versions": {
         "1.0.0": {
-          "url": "https://mixal1279.github.io/revenge-plugins/pool/global-search@1.0.0.zip",
+          "url": "https://raw.githubusercontent.com/mixal1279/revenge-plugins/gh-pages/pool/global-search@1.0.0.zip",
           "sha256": "ab4be06da6057ad350524f7d19aae2075d3b7b28283645f9dadffa664cde5a2e",
           "size": 3344,
           "dependencies": {
