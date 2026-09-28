@@ -74,6 +74,8 @@ jobs:
           cp "$PLUGIN_DIR/build/js/index.js" /tmp/plugin-package/index.js
 
           mkdir -p published/pool
+          cp "$MANIFEST" published/manifest.json
+          cp "$PLUGIN_DIR/build/js/index.js" published/index.js
           PACKAGE="/tmp/\${ID}@\${VERSION}.zip"
           (cd /tmp/plugin-package && zip -q -X "$PACKAGE" manifest.json index.js)
 
