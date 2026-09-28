@@ -74,7 +74,19 @@ jobs:
           cp "$PLUGIN_DIR/build/js/index.js" /tmp/plugin-package/index.js
 
           mkdir -p published/pool
-          cp "$MANIFEST" published/manifest.json
+          # Keep the published root compatible with Revenge's direct installer.
+          # The packaged ZIP keeps the native Revenge Next manifest; the root
+          # manifest additionally exposes the legacy main entrypoint used by
+          # the direct installer UI.
+          python3 - "$MANIFEST" published/manifest.json <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          source = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          source["main"] = "index.js"
+          Path(sys.argv[2]).write_text(json.dumps(source, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          PY
           cp "$PLUGIN_DIR/build/js/index.js" published/index.js
           PACKAGE="/tmp/\${ID}@\${VERSION}.zip"
           (cd /tmp/plugin-package && zip -q -X "$PACKAGE" manifest.json index.js)
