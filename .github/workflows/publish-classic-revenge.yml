@@ -39,7 +39,7 @@ jobs:
             "spec": 3,
             "type": "plugin",
             "id": "global-search",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "display": {
               "name": "Global Search",
               "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
@@ -69,6 +69,9 @@ jobs:
           cp /tmp/global-search/index.js builds/global-search/index.js
           cp /tmp/global-search/manifest.json builds/global-search/manifest.json
 
+          PLUGIN_HASH=$(sha256sum builds/global-search/index.js | awk '{print $1}')
+          sed -i "s/__PLUGIN_HASH__/$PLUGIN_HASH/" manifest.json
+
           cat > manifest.json <<'EOF'
           {
             "name": "Global Search",
@@ -80,12 +83,14 @@ jobs:
               }
             ],
             "main": "builds/global-search/index.js",
-            "hash": "8e45d639325009f8c6948ea417f68f96fab3c08fd9293aa0ddf4cedcc39b55ec",
+            "hash": "__PLUGIN_HASH__",
             "revenge": {
               "icon": "SearchIcon"
             }
           }
           EOF
+          PLUGIN_HASH=$(sha256sum builds/global-search/index.js | awk '{print $1}')
+          sed -i "s/__PLUGIN_HASH__/$PLUGIN_HASH/" manifest.json
 
           git add manifest.json builds/global-search/index.js builds/global-search/manifest.json
 
