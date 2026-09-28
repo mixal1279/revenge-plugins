@@ -1,4 +1,4 @@
-import { findByProps, findByStoreName, findByName } from "@revenge-mod/metro";
+import { find, findByProps, findByStoreName } from "@revenge-mod/metro";
 import { ReactNative as RN } from "@revenge-mod/metro/common";
 import { after } from "@revenge-mod/patcher";
 import { showToast } from "@revenge-mod/ui/toasts";
@@ -409,11 +409,13 @@ export function onLoad() {
 
   vstorage.showInChannelListHeader ??= true;
 
-  const ChannelListHeader = findByName("ChannelListHeader");
+  // Classic Revenge exposes ChannelHeader as the `default` export of its Metro module.
+  // The patcher patches a method on the exporting object, not the component function itself.
+  const ChannelHeaderModule = find((module: any) => module?.default?.name === "ChannelHeader");
 
-  if (ChannelListHeader) {
+  if (ChannelHeaderModule?.default) {
     patches.push(
-      after("default", ChannelListHeader, (_, res) => {
+      after("default", ChannelHeaderModule, (_, res) => {
         if (!vstorage.showInChannelListHeader || !res?.props) return;
 
         const searchBtn = React.createElement(
@@ -460,7 +462,7 @@ export function onLoad() {
     );
   } else {
     showToast(
-      "ChannelListHeader nie znaleziony — użyj ustawień pluginu.",
+      "ChannelHeader nie znaleziony — użyj ustawień pluginu.",
       getAssetIDByName("CircleXIcon-primary"),
     );
   }
