@@ -30,16 +30,16 @@ const result = await esbuild.build({
 let bundled = result.outputFiles[0].text;
 
 const requireMap = {
-  react: "(vendetta.metro.common.React||window.React)",
-  "react-native": "(vendetta.metro.common.ReactNative||window.ReactNative)",
-  "@revenge-mod": "vendetta",
-  "@revenge-mod/metro": "vendetta.metro",
-  "@revenge-mod/metro/common": "vendetta.metro.common",
-  "@revenge-mod/patcher": "vendetta.patcher",
-  "@revenge-mod/ui": "vendetta.ui",
-  "@revenge-mod/ui/toasts": "vendetta.ui.toasts",
-  "@revenge-mod/ui/assets": "vendetta.ui.assets",
-  "@revenge-mod/plugin": "vendetta.plugin"
+  react: "(bunny.metro.common.React||window.React)",
+  "react-native": "(bunny.metro.common.ReactNative||window.ReactNative)",
+  "@revenge-mod": "bunny",
+  "@revenge-mod/metro": "bunny.metro",
+  "@revenge-mod/metro/common": "bunny.metro.common",
+  "@revenge-mod/patcher": "bunny.patcher",
+  "@revenge-mod/ui": "bunny.ui",
+  "@revenge-mod/ui/toasts": "bunny.ui.toasts",
+  "@revenge-mod/ui/assets": "bunny.ui.assets",
+  "@revenge-mod/plugin": "({ storage: (bunny.plugin?.createStorage ? bunny.plugin.createStorage() : bunny.plugin?.storage) })"
 };
 
 bundled = bundled.replace(/require\("([^"]+)"\)/g, (match, id) => {
@@ -49,13 +49,13 @@ bundled = bundled.replace(/require\("([^"]+)"\)/g, (match, id) => {
 });
 
 const wrapped =
-  '(function(vendetta){' +
+  '(function(bunny){' +
   'var module={exports:{}};var exports=module.exports;\n' +
   bundled +
   '\n' +
   'globalThis.plugin=(module.exports&&module.exports.__esModule&&module.exports.default!=null)' +
   '?module.exports.default:(module.exports&&module.exports.default!=null?module.exports.default:module.exports);' +
-  '})(typeof vendetta!=="undefined"?vendetta:(typeof bunny!=="undefined"?bunny:globalThis.bunny));';
+  '})(bunny);';
 
 await mkdir("GlobalSearch", { recursive: true });
 await writeFile(out, wrapped);
