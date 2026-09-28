@@ -30,15 +30,15 @@ const result = await esbuild.build({
 let bundled = result.outputFiles[0].text;
 
 const requireMap = {
-  react: "(bunny.metro.common.React||window.React)",
-  "react-native": "(bunny.metro.common.ReactNative||window.ReactNative)",
-  "@revenge-mod": "bunny",
-  "@revenge-mod/metro": "bunny.metro",
-  "@revenge-mod/metro/common": "bunny.metro.common",
-  "@revenge-mod/patcher": "bunny.patcher",
-  "@revenge-mod/ui": "bunny.ui",
-  "@revenge-mod/ui/toasts": "bunny.ui.toasts",
-  "@revenge-mod/ui/assets": "bunny.ui.assets",
+  react: "(window.vendetta?.metro?.common?.React||window.React)",
+  "react-native": "(window.vendetta?.metro?.common?.ReactNative||window.ReactNative)",
+  "@revenge-mod": "(window.vendetta||bunny)",
+  "@revenge-mod/metro": "(window.vendetta?.metro||bunny.metro)",
+  "@revenge-mod/metro/common": "(window.vendetta?.metro?.common||bunny.metro.common)",
+  "@revenge-mod/patcher": "(window.vendetta?.patcher||bunny.api?.patcher)",
+  "@revenge-mod/ui": "(window.vendetta?.ui?.components||bunny.ui?.components)",
+  "@revenge-mod/ui/toasts": "(window.vendetta?.ui?.toasts||bunny.ui?.toasts)",
+  "@revenge-mod/ui/assets": "(window.vendetta?.ui?.assets||{})",
   "@revenge-mod/plugin": "({ storage: (bunny.plugin?.createStorage ? bunny.plugin.createStorage() : bunny.plugin?.storage) })"
 };
 
