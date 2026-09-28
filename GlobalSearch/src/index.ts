@@ -620,9 +620,58 @@ const HEADER_COMPONENT_NAMES = [
   "ChannelListHeader",
 ];
 
-function getHeaderModules() {
-  const modules: any[] = [];
+function getHeaderModules(): { module: any; exportName: string }[] {
+  const modules: { module: any; exportName: string }[] = [];
   const seen = new Set<any>();
+
+  const addComponent = (component: any) => {
+    if (!component) return;
+
+    // Classic Revenge's findByNameAll() returns the component function
+    // itself on this Discord build, not necessarily its webpack export
+    // object. Resolve that function back to the module that exports it.
+    let module: any = component;
+    let exportName = "default";
+
+    if (typeof component === "function") {
+      try {
+        const resolved = find((candidate: any) => {
+          try {
+            return Object.values(candidate || {}).some(
+              (value) => value === component,
+            );
+          } catch {
+            return false;
+          }
+        });
+
+        if (!resolved) return;
+
+        const entry = Object.entries(resolved).find(
+          ([, value]) => value === component,
+        );
+        if (!entry) return;
+
+        module = resolved;
+        exportName = entry[0];
+      } catch {
+        return;
+      }
+    } else if (typeof component === "object") {
+      const entry = Object.entries(component).find(
+        ([, value]) => typeof value === "function",
+      );
+      if (!entry) return;
+      exportName = entry[0];
+    }
+
+    if (!module || typeof module !== "object") return;
+    if (typeof module[exportName] !== "function") return;
+    if (seen.has(module)) return;
+
+    seen.add(module);
+    modules.push({ module, exportName });
+  };
 
   for (const name of HEADER_COMPONENT_NAMES) {
     let found: any[] = [];
@@ -632,22 +681,9 @@ function getHeaderModules() {
       found = [];
     }
 
-    for (const module of found) {
-      if (!module || seen.has(module)) continue;
-      seen.add(module);
-      modules.push(module);
+    for (const component of found) {
+      addComponent(component);
     }
-  }
-
-  // ChannelHeader was verified on this Classic Revenge build and is kept as
-  // a fallback even if findByNameAll is unavailable in an older build.
-  if (modules.length === 0) {
-    try {
-      const fallback = find(
-        (module: any) => module?.default?.name === "ChannelHeader",
-      );
-      if (fallback) modules.push(fallback);
-    } catch {}
   }
 
   return modules;
@@ -750,12 +786,12 @@ export function onLoad() {
   const searchIconId = getAssetIDByName("SearchIcon");
   const patchedModules = new Set<any>();
 
-  for (const module of getHeaderModules()) {
+  for (const { module, exportName } of getHeaderModules()) {
     if (!module || patchedModules.has(module)) continue;
     patchedModules.add(module);
 
     patches.push(
-      after("default", module, (_, res) => {
+      after(exportName, module, (_, res) => {
         if (!React.isValidElement(res)) return res;
         if (!vstorage.showInChannelListHeader) return res;
 
