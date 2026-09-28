@@ -15,5 +15,6 @@
   },
   "dist": {
     "script": "index.js"
-  }
+  },
+  "main": "index.js"
 }
