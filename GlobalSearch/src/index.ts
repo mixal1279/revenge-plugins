@@ -475,3 +475,12 @@ export function onUnload() {
 }
 
 export const settings = GlobalSearchUI;
+
+
+// Classic Revenge/Bunny native plugin lifecycle.
+// The loader expects a plugin instance with start/stop methods.
+export default {
+  start: onLoad,
+  stop: onUnload,
+  SettingsComponent: GlobalSearchUI,
+};
