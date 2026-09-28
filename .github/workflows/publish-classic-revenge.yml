@@ -1,0 +1,98 @@
+name: Publish Classic Revenge plugin
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "GlobalSearch/index.js"
+      - "GlobalSearch/manifest.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Prepare classic Revenge files
+        run: |
+          mkdir -p /tmp/global-search
+          cp GlobalSearch/index.js /tmp/global-search/index.js
+          cat > /tmp/global-search/manifest.json <<'EOF'
+          {
+            "spec": 3,
+            "type": "plugin",
+            "id": "global-search",
+            "version": "1.0.0",
+            "display": {
+              "name": "Global Search",
+              "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
+              "authors": [
+                {
+                  "name": "Michal",
+                  "id": "0"
+                }
+              ]
+            },
+            "main": "index.js",
+            "extras": {
+              "revenge": {}
+            }
+          }
+          EOF
+
+      - name: Publish to gh-pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin gh-pages:gh-pages
+          git checkout gh-pages
+
+          mkdir -p builds/global-search
+          cp /tmp/global-search/index.js builds/global-search/index.js
+          cp /tmp/global-search/manifest.json builds/global-search/manifest.json
+
+          cat > manifest.json <<'EOF'
+          {
+            "name": "Global Search",
+            "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
+            "authors": [
+              {
+                "name": "Michal",
+                "id": "0"
+              }
+            ],
+            "main": "builds/global-search/index.js",
+            "hash": "8e45d639325009f8c6948ea417f68f96fab3c08fd9293aa0ddf4cedcc39b55ec",
+            "revenge": {
+              "icon": "SearchIcon"
+            }
+          }
+          EOF
+
+          git add manifest.json builds/global-search/index.js builds/global-search/manifest.json
+
+          if git diff --cached --quiet; then
+            echo "No published changes."
+            exit 0
+          fi
+
+          git commit -m "publish: Global Search for classic Revenge"
+          git push origin gh-pages
