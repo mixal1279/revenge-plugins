@@ -1,17 +1,21 @@
-name: Build Global Search
+name: Build Revenge Next plugins
 
 on:
   push:
     branches:
       - main
+      - "feat/**"
       - "fix/**"
-    paths-ignore:
-      - "GlobalSearch/index.js"
-      - "GlobalSearch/manifest.json"
+    paths:
+      - "plugins/**"
+      - "package.json"
+      - "tsconfig.json"
+      - "bun.lock"
+      - ".github/workflows/build-revenge-plugins.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -20,26 +24,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm install
+        run: bun install
 
-      - name: Build plugin
-        run: npm run build
+      - name: Typecheck
+        run: bun run lint:types
+        continue-on-error: true
 
-      - name: Commit generated plugin
-        run: |
-          if git diff --quiet; then
-            echo "No generated changes."
-            exit 0
-          fi
+      - name: Build plugins
+        run: bun run build
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add GlobalSearch/index.js GlobalSearch/manifest.json
-          git commit -m "build(GlobalSearch): generate distributable plugin"
-          git push
+      - name: Upload plugin artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: revenge-plugins
+          path: |
+            plugins/*/build/
+            plugins/*/manifest.json
