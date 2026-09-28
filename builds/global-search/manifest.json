@@ -1,0 +1,20 @@
+{
+  "spec": 3,
+  "type": "plugin",
+  "id": "global-search",
+  "version": "1.0.0",
+  "display": {
+    "name": "Global Search",
+    "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
+    "authors": [
+      {
+        "name": "Michal",
+        "id": "0"
+      }
+    ]
+  },
+  "main": "index.js",
+  "extras": {
+    "revenge": {}
+  }
+}
