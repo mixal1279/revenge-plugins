@@ -516,6 +516,17 @@ const SearchModePicker = () => {
 
 // ─── onLoad / onUnload ───────────────────────────────────────────────────────
 
+const HEADER_COMPONENT_NAMES = [
+  "ChannelHeader",
+  "Header",
+  "FriendsHeader",
+  "PrivateChannelsHeader",
+  "DirectMessageHeader",
+  "DMListHeader",
+  "HomeHeader",
+  "ChannelListHeader",
+];
+
 export function onLoad() {
   showToast(
     "Global Search loaded!",
@@ -524,100 +535,116 @@ export function onLoad() {
 
   vstorage.showInChannelListHeader ??= true;
 
-  // Classic Revenge exposes ChannelHeader as the `default` export of its Metro module.
-  // The patcher patches a method on the exporting object, not the component function itself.
-  const ChannelHeaderModule = find((module: any) => module?.default?.name === "ChannelHeader");
+  const searchIconId = getAssetIDByName("SearchIcon");
+  const patchedModules = new Set<any>();
 
-  if (ChannelHeaderModule?.default) {
-    patches.push(
-      after("default", ChannelHeaderModule, (_, res) => {
-        if (!React.isValidElement(res)) return res;
-        if (!vstorage.showInChannelListHeader) return res;
+  const patchSearchButton = (node: any): { node: any; found: boolean } => {
+    if (!React.isValidElement(node)) {
+      return { node, found: false };
+    }
 
-        const searchIconId = getAssetIDByName("SearchIcon");
-        let searchButtonFound = false;
+    const children = node.props?.children;
+    const childArray = Array.isArray(children)
+      ? children
+      : children != null
+        ? [children]
+        : [];
 
-        const transform = (node: any): any => {
-          if (!React.isValidElement(node)) return node;
+    let changed = false;
+    let found = false;
 
-          const children = node.props?.children;
-          const childArray = Array.isArray(children)
-            ? children
-            : children != null
-              ? [children]
-              : [];
+    const nextChildren = childArray.map((child: any) => {
+      if (!React.isValidElement(child)) return child;
 
-          let changed = false;
-          const nextChildren = childArray.map((child: any) => {
-            if (!React.isValidElement(child)) return child;
+      const childChildren = child.props?.children;
+      const candidates = Array.isArray(childChildren)
+        ? childChildren
+        : childChildren != null
+          ? [childChildren]
+          : [];
 
-            const childChildren = child.props?.children;
-            const candidates = Array.isArray(childChildren)
-              ? childChildren
-              : childChildren != null
-                ? [childChildren]
-                : [];
+      const isNativeSearchButton =
+        typeof child.props?.onPress === "function" &&
+        candidates.some(
+          (candidate: any) =>
+            React.isValidElement(candidate) &&
+            candidate.props?.source === searchIconId,
+        );
 
-            const isSearchButton =
-              typeof child.props?.onPress === "function" &&
-              candidates.some(
-                (candidate: any) =>
-                  React.isValidElement(candidate) &&
-                  candidate.props?.source === searchIconId,
-              );
+      if (isNativeSearchButton) {
+        found = true;
+        changed = true;
 
-            if (isSearchButton) {
-              searchButtonFound = true;
-              changed = true;
-
-              return React.cloneElement(child, {
-                onPress: () =>
-                  (SearchModePicker as any)._open?.(child.props.onPress),
-              });
-            }
-
-            const transformed = transform(child);
-            if (transformed !== child) changed = true;
-            return transformed;
-          });
-
-          if (!changed) return node;
-
-          return React.cloneElement(node, {
-            children: Array.isArray(children)
-              ? nextChildren
-              : nextChildren[0] ?? null,
-          });
-        };
-
-        const transformed = transform(res);
-
-        if (!searchButtonFound) return transformed;
-
-        // Mount the picker once alongside the existing header children.
-        const picker = React.createElement(SearchModePicker, {
-          key: "global-search-mode-picker",
+        return React.cloneElement(child, {
+          onPress: () =>
+            (SearchModePicker as any)._open?.(child.props.onPress),
         });
+      }
 
-        const children = transformed.props?.children;
-        if (Array.isArray(children)) {
+      const result = patchSearchButton(child);
+      if (result.found) found = true;
+      if (result.node !== child) changed = true;
+      return result.node;
+    });
+
+    if (!changed) return { node, found };
+
+    return {
+      node: React.cloneElement(node, {
+        children: Array.isArray(children)
+          ? nextChildren
+          : nextChildren[0] ?? null,
+      }),
+      found,
+    };
+  };
+
+  for (const name of HEADER_COMPONENT_NAMES) {
+    const modules = [
+      ...(find((module: any) => module?.default?.name === name)
+        ? [find((module: any) => module?.default?.name === name)]
+        : []),
+    ];
+
+    for (const module of modules) {
+      if (!module || patchedModules.has(module)) continue;
+      patchedModules.add(module);
+
+      patches.push(
+        after("default", module, (_, res) => {
+          if (!React.isValidElement(res)) return res;
+          if (!vstorage.showInChannelListHeader) return res;
+
+          const result = patchSearchButton(res);
+          if (!result.found) return res;
+
+          const children = result.node.props?.children;
+          if (!Array.isArray(children)) return result.node;
+
           if (
-            !children.some(
+            children.some(
               (child: any) => child?.key === "global-search-mode-picker",
             )
           ) {
-            return React.cloneElement(transformed, {
-              children: [...children, picker],
-            });
+            return result.node;
           }
-        }
 
-        return transformed;
-      }),
-    );
-  } else {
+          return React.cloneElement(result.node, {
+            children: [
+              ...children,
+              React.createElement(SearchModePicker, {
+                key: "global-search-mode-picker",
+              }),
+            ],
+          });
+        }),
+      );
+    }
+  }
+
+  if (patches.length === 0) {
     showToast(
-      "ChannelHeader nie znaleziony — użyj ustawień pluginu.",
+      "Nie znaleziono nagłówków wyszukiwania.",
       getAssetIDByName("CircleXIcon-primary"),
     );
   }
@@ -632,7 +659,6 @@ export function onUnload() {
 }
 
 export const settings = GlobalSearchUI;
-
 
 // Classic Revenge/Bunny native plugin lifecycle.
 // The loader expects a plugin instance with start/stop methods.
