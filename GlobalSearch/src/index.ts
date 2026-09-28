@@ -703,12 +703,20 @@ function patchSearchButton(
 
     if (isNativeSearchButton) {
       found = true;
+
+      if (child.props?.onPress?.__globalSearchPatched) {
+        return child;
+      }
+
       changed = true;
 
+      const wrappedOnPress = () => {
+        (SearchModePicker as any)._open?.(child.props.onPress);
+      };
+      (wrappedOnPress as any).__globalSearchPatched = true;
+
       return React.cloneElement(child, {
-        onPress: () => {
-          (SearchModePicker as any)._open?.(child.props.onPress);
-        },
+        onPress: wrappedOnPress,
       });
     }
 
