@@ -2,7 +2,7 @@
   "spec": 3,
   "type": "plugin",
   "id": "global-search",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "display": {
     "name": "Global Search",
     "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
