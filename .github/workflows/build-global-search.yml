@@ -21,13 +21,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
 
       - name: Setup Bun
@@ -40,7 +40,6 @@ jobs:
 
       - name: Typecheck
         run: bun run lint:types
-        continue-on-error: true
 
       - name: Build plugins
         run: bun run build
@@ -52,3 +51,80 @@ jobs:
           path: |
             plugins/*/build/
             plugins/*/manifest.json
+
+      - name: Checkout published pool
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: published
+
+      - name: Package and publish Global Search
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PLUGIN_DIR="plugins/global-search"
+          MANIFEST="$PLUGIN_DIR/manifest.json"
+          VERSION="$(python3 -c 'import json; print(json.load(open("'"$MANIFEST"'"))["version"])')"
+          ID="$(python3 -c 'import json; print(json.load(open("'"$MANIFEST"'"))["id"])')"
+
+          test -f "$PLUGIN_DIR/build/js/index.js"
+          mkdir -p /tmp/plugin-package
+          cp "$MANIFEST" /tmp/plugin-package/manifest.json
+          cp "$PLUGIN_DIR/build/js/index.js" /tmp/plugin-package/index.js
+
+          mkdir -p published/pool
+          PACKAGE="/tmp/\${ID}@\${VERSION}.zip"
+          (cd /tmp/plugin-package && zip -q -X "$PACKAGE" manifest.json index.js)
+
+          cp "$PACKAGE" "published/pool/\${ID}@\${VERSION}.zip"
+
+          SHA256="$(sha256sum "$PACKAGE" | cut -d' ' -f1)"
+          SIZE="$(stat -c '%s' "$PACKAGE")"
+
+          python3 - "$SHA256" "$SIZE" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          sha256, size = sys.argv[1], int(sys.argv[2])
+          path = Path("published/index.json")
+
+          data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {
+              "format": 1,
+              "name": "Michał Shotmaker's Revenge Next Plugins",
+              "description": "Plugins for Revenge Next by Michał Shotmaker.",
+              "plugins": {}
+          }
+
+          plugin = data.setdefault("plugins", {}).setdefault("global-search", {
+              "name": "Global Search",
+              "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
+              "author": "Michal",
+              "channels": {}
+          })
+
+          plugin["channels"]["latest"] = "1.0.0"
+          plugin.setdefault("versions", {})["1.0.0"] = {
+              "url": "https://mixal1279.github.io/revenge-plugins/pool/global-search@1.0.0.zip",
+              "sha256": sha256,
+              "size": size,
+              "dependencies": {
+                  "revenge.api": {"version": ">=1 <2"},
+                  "discord": {"version": "*"}
+              }
+          }
+
+          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          PY
+
+          touch published/.nojekyll
+          git -C published config user.name "github-actions[bot]"
+          git -C published config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C published add index.json pool .nojekyll
+          if git -C published diff --cached --quiet; then
+            echo "No published changes."
+          else
+            git -C published commit -m "Publish Global Search \${VERSION}"
+            git -C published push origin HEAD:gh-pages
+          fi
