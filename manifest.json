@@ -1,20 +1,15 @@
 {
-  "format": 1,
-  "id": "global-search",
   "name": "Global Search",
   "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
-  "author": "Michal",
-  "version": "1.0.0",
-  "dependencies": {
-    "revenge.api": {
-      "version": ">=1 <2"
-    },
-    "discord": {
-      "version": "*"
+  "authors": [
+    {
+      "name": "Michal",
+      "id": "0"
     }
-  },
-  "dist": {
-    "script": "index.js"
-  },
-  "main": "index.js"
+  ],
+  "main": "builds/global-search/index.js",
+  "hash": "8e45d639325009f8c6948ea417f68f96fab3c08fd9293aa0ddf4cedcc39b55ec",
+  "revenge": {
+    "icon": "SearchIcon"
+  }
 }
