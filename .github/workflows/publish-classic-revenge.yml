@@ -67,6 +67,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git fetch origin gh-pages:gh-pages
+          git reset --hard HEAD
           git checkout gh-pages
 
           mkdir -p builds/global-search
