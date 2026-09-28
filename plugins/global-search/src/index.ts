@@ -443,7 +443,7 @@ function SettingsComponent() {
 export default plugin({
   SettingsComponent,
 
-  start(api) {
+  async start(api) {
     const settings = storage.cache ?? (await storage.get());
 
     if (!settings.showInChannelListHeader) return;
