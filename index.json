@@ -13,7 +13,7 @@
       "versions": {
         "1.0.0": {
           "url": "https://mixal1279.github.io/revenge-plugins/pool/global-search@1.0.0.zip",
-          "sha256": "b2be443bc42186529f2c8225bdc4d6e7c15f381ca85b3ecceeb9c80a3588b9f8",
+          "sha256": "5f1aefedde080ae078a1a6f8434e2962fda683f832bbe6b1a73c7b625257fddb",
           "size": 3235,
           "dependencies": {
             "revenge.api": {
