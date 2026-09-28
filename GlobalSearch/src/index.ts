@@ -665,44 +665,6 @@ function containsGlobalSearchPicker(children: any) {
   );
 }
 
-function findNativeSearchButton_unused(node: any, searchIconId: any): any | null {
-  if (!React.isValidElement(node)) return null;
-
-  const children = node.props?.children;
-  const list = Array.isArray(children)
-    ? children
-    : children != null
-      ? [children]
-      : [];
-
-  for (const child of list) {
-    if (!React.isValidElement(child)) continue;
-
-    const childChildren = child.props?.children;
-    const candidates = Array.isArray(childChildren)
-      ? childChildren
-      : childChildren != null
-        ? [childChildren]
-        : [];
-
-    if (
-      typeof child.props?.onPress === "function" &&
-      candidates.some(
-        (candidate: any) =>
-          React.isValidElement(candidate) &&
-          candidate.props?.source === searchIconId,
-      )
-    ) {
-      return child;
-    }
-
-    const nested = findNativeSearchButton(child, searchIconId);
-    if (nested) return nested;
-  }
-
-  return null;
-}
-
 function patchSearchButton(
   node: any,
   searchIconId: any,
