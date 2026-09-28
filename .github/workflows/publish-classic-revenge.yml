@@ -1,5 +1,9 @@
 name: Publish Classic Revenge plugin
 
+concurrency:
+  group: publish-classic-revenge
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -39,7 +43,7 @@ jobs:
             "spec": 3,
             "type": "plugin",
             "id": "global-search",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "display": {
               "name": "Global Search",
               "description": "Wyszukiwarka wiadomości we wszystkich serwerach jednocześnie.",
@@ -68,9 +72,6 @@ jobs:
           mkdir -p builds/global-search
           cp /tmp/global-search/index.js builds/global-search/index.js
           cp /tmp/global-search/manifest.json builds/global-search/manifest.json
-
-          PLUGIN_HASH=$(sha256sum builds/global-search/index.js | awk '{print $1}')
-          sed -i "s/__PLUGIN_HASH__/$PLUGIN_HASH/" manifest.json
 
           cat > manifest.json <<'EOF'
           {
