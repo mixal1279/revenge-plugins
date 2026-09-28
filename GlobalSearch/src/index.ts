@@ -29,8 +29,21 @@ const getAPIBaseURL =
 
 // Optional navigation modules. Search results remain usable even if a
 // particular Discord build does not expose one of these actions.
-const MessageActions = findByProps("jumpToMessage");
-const ChannelActions = findByProps("selectChannel");
+function getMessageActions() {
+  try {
+    return findByProps("jumpToMessage");
+  } catch {
+    return undefined;
+  }
+}
+
+function getChannelActions() {
+  try {
+    return findByProps("selectChannel");
+  } catch {
+    return undefined;
+  }
+}
 
 const patches: (() => void)[] = [];
 
@@ -131,7 +144,7 @@ async function performGlobalSearch(
       "Brak tokenu Discord!",
       getAssetIDByName("CircleXIcon-primary"),
     );
-    return { messages: [], totalResults: 0 };
+    return { messages: [], totalResults: 0, hasMore: false };
   }
 
   const guilds = Object.values(GuildStore?.getGuilds?.() ?? {}) as any[];
@@ -191,7 +204,7 @@ async function openSearchResult(item: any) {
     return;
   }
 
-  const jump = MessageActions?.jumpToMessage;
+  const jump = getMessageActions()?.jumpToMessage;
   if (typeof jump === "function") {
     try {
       await Promise.resolve(
@@ -213,7 +226,7 @@ async function openSearchResult(item: any) {
     }
   }
 
-  const selectChannel = ChannelActions?.selectChannel;
+  const selectChannel = getChannelActions()?.selectChannel;
   if (typeof selectChannel === "function") {
     try {
       selectChannel(channelId);
@@ -652,7 +665,7 @@ function containsGlobalSearchPicker(children: any) {
   );
 }
 
-function findNativeSearchButton(node: any, searchIconId: any): any | null {
+function findNativeSearchButton_unused(node: any, searchIconId: any): any | null {
   if (!React.isValidElement(node)) return null;
 
   const children = node.props?.children;
