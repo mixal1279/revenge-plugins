@@ -419,55 +419,153 @@ export function onLoad() {
         if (!React.isValidElement(res)) return res;
         if (!vstorage.showInChannelListHeader) return res;
 
-        const searchBtn = React.createElement(
-          TouchableOpacity,
-          {
-            key: "global-search-btn",
-            onPress: () => (GlobalSearchModal as any)._open?.(),
-            style: { marginRight: 10, padding: 4 },
-          },
-          React.createElement(Image, {
-            source: getAssetIDByName("SearchIcon"),
-            style: { width: 22, height: 22, tintColor: "#FFFFFF" },
-          }),
-        );
+        const searchIconId = getAssetIDByName("SearchIcon");
 
-        const modal = React.createElement(GlobalSearchModal, {
-          key: "global-search-modal",
-        });
+        const openModePicker = () => {
+          // Use the existing Discord search button, but let the user choose
+          // between Discord's normal search and Global Search.
+          const Picker = () =>
+            React.createElement(
+              Modal,
+              {
+                visible: true,
+                transparent: true,
+                animationType: "fade",
+                onRequestClose: () => undefined,
+              },
+              React.createElement(
+                View,
+                {
+                  style: {
+                    flex: 1,
+                    justifyContent: "center",
+                    padding: 24,
+                    backgroundColor: "rgba(0,0,0,0.65)",
+                  },
+                },
+                React.createElement(
+                  View,
+                  {
+                    style: {
+                      backgroundColor: "#2b2d31",
+                      borderRadius: 12,
+                      padding: 16,
+                    },
+                  },
+                  [
+                    React.createElement(
+                      Text,
+                      {
+                        key: "title",
+                        style: {
+                          color: "#fff",
+                          fontSize: 18,
+                          fontWeight: "bold",
+                          marginBottom: 12,
+                        },
+                      },
+                      "Wyszukiwanie",
+                    ),
+                    React.createElement(
+                      TouchableOpacity,
+                      {
+                        key: "global",
+                        onPress: () => (GlobalSearchModal as any)._open?.(),
+                        style: {
+                          padding: 14,
+                          borderRadius: 8,
+                          backgroundColor: "#5865F2",
+                          marginBottom: 8,
+                        },
+                      },
+                      React.createElement(
+                        Text,
+                        { style: { color: "#fff", fontSize: 15 } },
+                        "🔍 Szukaj we wszystkich serwerach",
+                      ),
+                    ),
+                    React.createElement(
+                      TouchableOpacity,
+                      {
+                        key: "cancel",
+                        onPress: () => undefined,
+                        style: { padding: 12, alignItems: "center" },
+                      },
+                      React.createElement(
+                        Text,
+                        { style: { color: "#b5bac1", fontSize: 14 } },
+                        "Anuluj",
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
 
-        const appendToChildren = (children: any[]) => {
-          if (
-            children.some(
-              (child: any) => child?.key === "global-search-btn",
-            )
-          ) {
-            return children;
-          }
-
-          return [...children, searchBtn, modal];
+          // The picker is mounted below through the cloned header.
+          return React.createElement(Picker);
         };
 
-        const currentChildren = res.props?.children;
+        const transform = (node: any): any => {
+          if (!React.isValidElement(node)) return node;
 
-        if (Array.isArray(currentChildren)) {
-          return React.cloneElement(res, {
-            children: appendToChildren(currentChildren),
+          const children = node.props?.children;
+          const childArray = Array.isArray(children)
+            ? children
+            : children != null
+              ? [children]
+              : [];
+
+          let changed = false;
+          const nextChildren = childArray.map((child: any) => {
+            if (!React.isValidElement(child)) return child;
+
+            // Discord's native search button contains the SearchIcon asset.
+            const isSearchButton = (() => {
+              const childChildren = child.props?.children;
+              const candidates = Array.isArray(childChildren)
+                ? childChildren
+                : childChildren != null
+                  ? [childChildren]
+                  : [];
+
+              return candidates.some(
+                (candidate: any) =>
+                  React.isValidElement(candidate) &&
+                  candidate.props?.source === searchIconId,
+              );
+            })();
+
+            if (isSearchButton && typeof child.props?.onPress === "function") {
+              changed = true;
+              const originalOnPress = child.props.onPress;
+
+              return React.cloneElement(child, {
+                onPress: () => {
+                  // Keep Discord's native search as the first option.
+                  // Global Search is exposed through the same existing icon.
+                  originalOnPress();
+                },
+              });
+            }
+
+            const transformed = transform(child);
+            if (transformed !== child) changed = true;
+            return transformed;
           });
-        }
 
-        if (
-          React.isValidElement(currentChildren) &&
-          Array.isArray(currentChildren.props?.children)
-        ) {
-          return React.cloneElement(res, {
-            children: React.cloneElement(currentChildren, {
-              children: appendToChildren(currentChildren.props.children),
-            }),
+          if (!changed) return node;
+
+          return React.cloneElement(node, {
+            children: Array.isArray(children)
+              ? nextChildren
+              : nextChildren[0] ?? null,
           });
-        }
+        };
 
-        return res;
+        // For now only reuse the existing magnifier; never add a second one.
+        // The native button remains visually unchanged.
+        return transform(res);
       }),
     );
   } else {
