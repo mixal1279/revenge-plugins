@@ -49,10 +49,13 @@ bundled = bundled.replace(/require\("([^"]+)"\)/g, (match, id) => {
 });
 
 const wrapped =
+  '(function(vendetta){' +
   'var module={exports:{}};var exports=module.exports;\n' +
   bundled +
-  '\nvar plugin=(module.exports&&module.exports.__esModule&&module.exports.default!=null)' +
-  '?module.exports.default:(module.exports&&module.exports.default!=null?module.exports.default:module.exports);';
+  '\n' +
+  'globalThis.plugin=(module.exports&&module.exports.__esModule&&module.exports.default!=null)' +
+  '?module.exports.default:(module.exports&&module.exports.default!=null?module.exports.default:module.exports);' +
+  '})(typeof vendetta!=="undefined"?vendetta:(typeof bunny!=="undefined"?bunny:globalThis.bunny));';
 
 await mkdir("GlobalSearch", { recursive: true });
 await writeFile(out, wrapped);
