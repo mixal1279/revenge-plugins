@@ -416,7 +416,8 @@ export function onLoad() {
   if (ChannelHeaderModule?.default) {
     patches.push(
       after("default", ChannelHeaderModule, (_, res) => {
-        if (!vstorage.showInChannelListHeader || !res?.props) return;
+        if (!React.isValidElement(res)) return res;
+        if (!vstorage.showInChannelListHeader) return res;
 
         const searchBtn = React.createElement(
           TouchableOpacity,
@@ -435,29 +436,38 @@ export function onLoad() {
           key: "global-search-modal",
         });
 
-        const currentChildren = res.props.children;
+        const appendToChildren = (children: any[]) => {
+          if (
+            children.some(
+              (child: any) => child?.key === "global-search-btn",
+            )
+          ) {
+            return children;
+          }
+
+          return [...children, searchBtn, modal];
+        };
+
+        const currentChildren = res.props?.children;
 
         if (Array.isArray(currentChildren)) {
-          const children = currentChildren.slice();
-
-          // Avoid adding duplicate controls when Discord re-renders the header.
-          if (!children.some((child: any) => child?.key === "global-search-btn")) {
-            children.push(searchBtn, modal);
-            res.props.children = children;
-          }
-        } else if (
-          currentChildren?.props &&
-          Array.isArray(currentChildren.props.children)
-        ) {
-          const nested = currentChildren.props.children.slice();
-
-          if (!nested.some((child: any) => child?.key === "global-search-btn")) {
-            nested.push(searchBtn, modal);
-            res.props.children = React.cloneElement(currentChildren, {
-              children: nested,
-            });
-          }
+          return React.cloneElement(res, {
+            children: appendToChildren(currentChildren),
+          });
         }
+
+        if (
+          React.isValidElement(currentChildren) &&
+          Array.isArray(currentChildren.props?.children)
+        ) {
+          return React.cloneElement(res, {
+            children: React.cloneElement(currentChildren, {
+              children: appendToChildren(currentChildren.props.children),
+            }),
+          });
+        }
+
+        return res;
       }),
     );
   } else {
